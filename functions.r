@@ -1,8 +1,22 @@
 
-#plotTheme FOR CHAPTER 1, 6, 7 = title_size = 16
-#plotTheme FOR CHAPTER 2       = title_size = 24
-#plotTheme FOR CHAPTER 3,4,5,8 = title_size = 14
-plotTheme <- function(base_size = 12, title_size = 16) {
+map_theme <- function(base_size = 12, title_size = 16) {
+  theme(
+    text = element_text( color = "black"),
+    plot.title = element_text(size = title_size, colour = "black"),
+    plot.subtitle = element_text(face = "italic"),
+    plot.caption = element_text(hjust = 0),
+    axis.ticks = element_blank(),
+    panel.background = element_blank(), 
+    axis.title = element_blank(),
+    axis.text = element_blank(),
+    axis.title.x = element_blank(),
+    axis.title.y = element_blank(),
+    panel.grid.minor = element_blank(),
+    panel.border = element_rect(colour = "black", fill = NA, linewidth = 2),
+    strip.text.x = element_text(size = 14))
+}
+
+plot_theme <- function(base_size = 12, title_size = 16) {
   theme(
     text = element_text( color = "black"),
     plot.title = element_text(size = title_size, colour = "black"), 
@@ -25,34 +39,15 @@ plotTheme <- function(base_size = 12, title_size = 16) {
   )
 }
 
-#mapTheme FOR CHAPTER 1       = title_size = 16
-#mapTheme FOR CHAPTER 2       = title_size = 24
-#mapTheme FOR CHAPTER 3,4,5,8 = title_size = 14
-mapTheme <- function(base_size = 12, title_size = 16) {
-  theme(
-    text = element_text( color = "black"),
-    plot.title = element_text(size = title_size,colour = "black"),
-    plot.subtitle=element_text(face="italic"),
-    plot.caption=element_text(hjust=0),
-    axis.ticks = element_blank(),
-    panel.background = element_blank(),axis.title = element_blank(),
-    axis.text = element_blank(),
-    axis.title.x = element_blank(),
-    axis.title.y = element_blank(),
-    panel.grid.minor = element_blank(),
-    panel.border = element_rect(colour = "black", fill=NA, size=2),
-    strip.text.x = element_text(size = 14))
-}
-
 q5 <- function(variable) {as.factor(ntile(variable, 5))}
 
-qBr <- function(df, variable, rnd) {
+q_br <- function(df, variable, rnd) {
   if (missing(rnd)) {
     as.character(quantile(round(df[[variable]],0),
-                          c(.01,.2,.4,.6,.8), na.rm=T))
+                          c(.01,.2,.4,.6,.8), na.rm = T))
   } else if (rnd == FALSE | rnd == F) {
     as.character(formatC(quantile(df[[variable]],
-                                  c(.01,.2,.4,.6,.8), na.rm=T),
+                                  c(.01,.2,.4,.6,.8), na.rm = T),
                          digits = 3))
   }
 }
@@ -65,14 +60,14 @@ rast <- function(inRaster) {
 
 ##this is the nearest neighbor function
 nn_function <- function(measureFrom,measureTo,k) {
-  measureFrom_Matrix <-
-    as.matrix(measureFrom)
-  measureTo_Matrix <-
-    as.matrix(measureTo)
-  nn <-   
-    get.knnx(measureTo, measureFrom, k)$nn.dist
-  output <-
-    as.data.frame(nn) %>%
+  
+  measureFrom_Matrix <- as.matrix(measureFrom)
+  
+  measureTo_Matrix <- as.matrix(measureTo)
+  
+  nn <- get.knnx(measureTo, measureFrom, k)$nn.dist
+  
+  output <- as.data.frame(nn) %>%
     rownames_to_column(var = "thisPoint") %>%
     gather(points, point_distance, V1:ncol(.)) %>%
     arrange(as.numeric(thisPoint)) %>%
@@ -86,8 +81,7 @@ nn_function <- function(measureFrom,measureTo,k) {
 }
 
 # Multi-ring Buffer
-multipleRingBuffer <- function(inputPolygon, maxDistance, interval) 
-{
+multi_ring_buffer <- function(inputPolygon, maxDistance, interval) {
   #create a list of distances that we'll iterate through to create each ring
   distances <- seq(0, maxDistance, interval)
   #we'll start with the second value in that list - the first is '0'
@@ -169,7 +163,7 @@ multipleRingBuffer <- function(inputPolygon, maxDistance, interval)
 }
 
 # Cross-validate function from chapter 5 (left in chapter)
-crossValidate <- function(dataset, id, dependentVariable, indVariables) {
+cross_validate <- function(dataset, id, dependent, indVariables) {
   
   allPredictions <- data.frame()
   cvID_list <- unique(dataset[[id]])
@@ -195,8 +189,7 @@ crossValidate <- function(dataset, id, dependentVariable, indVariables) {
     thisPrediction <-
       mutate(fold.test, Prediction = predict(regression, fold.test, type = "response"))
     
-    allPredictions <-
-      rbind(allPredictions, thisPrediction)
+    allPredictions <- rbind(allPredictions, thisPrediction)
     
   }
   return(st_sf(allPredictions))
