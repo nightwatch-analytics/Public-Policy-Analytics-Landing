@@ -1,4 +1,24 @@
+# Transform ----
+q5 <- function(variable) {as.factor(ntile(variable, 5))}
 
+q_br <- function(df, variable, rnd) {
+  if (missing(rnd)) {
+    as.character(quantile(round(df[[variable]],0),
+                          c(.01,.2,.4,.6,.8), na.rm = T))
+  } else if (rnd == FALSE | rnd == F) {
+    as.character(formatC(quantile(df[[variable]],
+                                  c(.01,.2,.4,.6,.8), na.rm = T),
+                         digits = 3))
+  }
+}
+
+# converts a raster to a data frame that can be plotted
+rast <- function(inRaster) {
+  data.frame(
+    xyFromCell(inRaster, 1:ncell(inRaster)), 
+    value = getValues(inRaster)) }
+
+# Visualize ----
 map_theme <- function(base_size = 12, title_size = 16) {
   theme(
     text = element_text( color = "black"),
@@ -39,27 +59,9 @@ plot_theme <- function(base_size = 12, title_size = 16) {
   )
 }
 
-q5 <- function(variable) {as.factor(ntile(variable, 5))}
-
-q_br <- function(df, variable, rnd) {
-  if (missing(rnd)) {
-    as.character(quantile(round(df[[variable]],0),
-                          c(.01,.2,.4,.6,.8), na.rm = T))
-  } else if (rnd == FALSE | rnd == F) {
-    as.character(formatC(quantile(df[[variable]],
-                                  c(.01,.2,.4,.6,.8), na.rm = T),
-                         digits = 3))
-  }
-}
-
-#this function converts a raster to a data frame that can be plotted
-rast <- function(inRaster) {
-  data.frame(
-    xyFromCell(inRaster, 1:ncell(inRaster)), 
-    value = getValues(inRaster)) }
 
 ##this is the nearest neighbor function
-nn_function <- function(measureFrom,measureTo,k) {
+get_nn <- function(measureFrom, measureTo, k) {
   
   measureFrom_Matrix <- as.matrix(measureFrom)
   
@@ -82,40 +84,35 @@ nn_function <- function(measureFrom,measureTo,k) {
 
 # Multi-ring Buffer
 multi_ring_buffer <- function(inputPolygon, maxDistance, interval) {
-  #create a list of distances that we'll iterate through to create each ring
+  # create a list of distances that we'll iterate through to create each ring
   distances <- seq(0, maxDistance, interval)
-  #we'll start with the second value in that list - the first is '0'
+  # we'll start with the second value in that list - the first is '0'
   distancesCounter <- 2
-  #total number of rings we're going to create
+  # total number of rings we're going to create
   numberOfRings <- floor(maxDistance / interval)
-  #a counter of number of rings
+  # a counter of number of rings
   numberOfRingsCounter <- 1
-  #initialize an otuput data frame (that is not an sf)
+  # initialize an otuput data frame (that is not an sf)
   allRings <- data.frame()
   
-  #while number of rings  counteris less than the specified nubmer of rings
-  while (numberOfRingsCounter <= numberOfRings) 
-  {
-    #if we're interested in a negative buffer and this is the first buffer
-    #(ie. not distance = '0' in the distances list)
-    if(distances[distancesCounter] < 0 & distancesCounter == 2)
-    {
-      #buffer the input by the first distance
+  # while number of rings counter is less than the specified nubmer of rings
+  while (numberOfRingsCounter <= numberOfRings) {
+    # if we're interested in a negative buffer and this is the first buffer
+    # (ie. not distance = '0' in the distances list)
+    if(distances[distancesCounter] < 0 & distancesCounter == 2) {
+      # buffer the input by the first distance
       buffer1 <- st_buffer(inputPolygon, distances[distancesCounter])
-      #different that buffer from the input polygon to get the first ring
+      # different that buffer from the input polygon to get the first ring
       buffer1_ <- st_difference(inputPolygon, buffer1)
-      #cast this sf as a polygon geometry type
+      # cast this sf as a polygon geometry type
       thisRing <- st_cast(buffer1_, "POLYGON")
-      #take the last column which is 'geometry'
+      # take the last column which is 'geometry'
       thisRing <- as.data.frame(st_geometry(thisRing))
-      #add a new field, 'distance' so we know how far the distance is for a give ring
+      # add a new field, 'distance' so we know how far the distance is for a give ring
       thisRing$distance <- distances[distancesCounter]
     }
-    
-    
-    #otherwise, if this is the second or more ring (and a negative buffer)
-    else if(distances[distancesCounter] < 0 & distancesCounter > 2) 
-    {
+    # otherwise, if this is the second or more ring (and a negative buffer)
+    else if(distances[distancesCounter] < 0 & distancesCounter > 2) {
       #buffer by a specific distance
       buffer1 <- st_buffer(inputPolygon, distances[distancesCounter])
       #create the next smallest buffer
@@ -131,10 +128,8 @@ multi_ring_buffer <- function(inputPolygon, maxDistance, interval) {
       #create the distance field
       thisRing$distance <- distances[distancesCounter]
     }
-    
     #Otherwise, if its a positive buffer
-    else 
-    {
+    else {
       #Create a positive buffer
       buffer1 <- st_buffer(inputPolygon, distances[distancesCounter])
       #create a positive buffer that is one distance smaller. So if its the first buffer
@@ -163,7 +158,7 @@ multi_ring_buffer <- function(inputPolygon, maxDistance, interval) {
 }
 
 # Cross-validate function from chapter 5 (left in chapter)
-cross_validate <- function(dataset, id, dependent, indVariables) {
+cross_validate <- function(dataset, id, dependent, independent) {
   
   allPredictions <- data.frame()
   cvID_list <- unique(dataset[[id]])
@@ -173,26 +168,28 @@ cross_validate <- function(dataset, id, dependent, indVariables) {
     thisFold <- i
     cat("This hold out fold is", thisFold, "\n")
     
-    fold.train <- filter(dataset, dataset[[id]] != thisFold) %>% as.data.frame() %>% 
-      dplyr::select(id, geometry, all_of(indVariables),
-                    all_of(dependentVariable))
-    fold.test  <- filter(dataset, dataset[[id]] == thisFold) %>% as.data.frame() %>% 
-      dplyr::select(id, geometry, all_of(indVariables),
-                    all_of(dependentVariable))
+    fold_train <- filter(dataset, dataset[[id]] != thisFold) %>% 
+                    as.data.frame() %>% 
+                      dplyr::select(id, geometry, all_of(independent), all_of(dependent))
     
-    form_parts <- paste0(dependentVariable, " ~ ", paste0(indVariables, collapse = "+"))
+    fold_test  <- filter(dataset, dataset[[id]] == thisFold) %>% 
+                    as.data.frame() %>% 
+                    dplyr::select(id, geometry, all_of(independent), all_of(dependent))
+    
+    form_parts <- paste0(dependentVariable, " ~ ", paste0(independent, collapse = "+"))
+    
     form <- as.formula(form_parts)
+    
     regression <- glm(form, family = "poisson",
-                      data = fold.train %>%
+                      data = fold_train %>%
                         dplyr::select(-geometry, -id))
     
-    thisPrediction <-
-      mutate(fold.test, Prediction = predict(regression, fold.test, type = "response"))
+    this_prediction <- mutate(fold_test, Prediction = predict(regression, fold_test, type = "response"))
     
-    allPredictions <- rbind(allPredictions, thisPrediction)
+    all_predictions <- rbind(all_predictions, this_prediction)
     
   }
-  return(st_sf(allPredictions))
+  return(st_sf(all_predictions))
 }
 
 
